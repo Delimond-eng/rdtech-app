@@ -1,0 +1,12 @@
+flutter_native_splash:
+  color: "#000000"
+  image: assets/images/mamba.png
+  branding: assets/images/branding_text.png
+  android: true
+  fullscreen: true
+
+  android_12:
+    color: "#000000"
+    image: assets/images/mamba.png
+    branding: assets/images/branding_text.png
+  #dart run flutter_native_splash:create
