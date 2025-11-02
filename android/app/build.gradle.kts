@@ -1,5 +1,8 @@
 plugins {
     id("com.android.application")
+    // START: FlutterFire Configuration
+    id("com.google.gms.google-services")
+    // END: FlutterFire Configuration
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
@@ -34,8 +37,8 @@ android {
     buildTypes {
         buildTypes {
             getByName("release") {
-                isMinifyEnabled = true
-                isShrinkResources = true
+                isMinifyEnabled = false
+                isShrinkResources = false
                 proguardFiles(
                     getDefaultProguardFile("proguard-android-optimize.txt"),
                     file("proguard-rules.pro")
@@ -47,7 +50,7 @@ android {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 

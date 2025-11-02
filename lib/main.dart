@@ -1,39 +1,37 @@
 import 'package:checkpoint_app/constants/styles.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:provider/provider.dart';
 
 import '/kernel/application.dart';
 import '/kernel/controllers/tag_controller.dart';
+import 'firebase_options.dart';
 import 'kernel/controllers/auth_controller.dart';
-import 'kernel/services/recognition_service.dart';
+import 'kernel/controllers/face_recognition_controller.dart';
+import 'kernel/services/firebase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialiser GetStorage AVANT
+  try {
+    await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform);
+    /* await FirebaseMessaging.instance.requestPermission(); */
+    await FirebaseService.initFCM();
+    // await FirebaseService.getToken();
+  } catch (e) {
+    if (kDebugMode) {
+      print(e);
+    }
+  }
   await GetStorage.init();
-
-  // Enregistrer les dépendances AVANT toute utilisation
-  Get.put(TagsController());
   Get.put(AuthController());
-  // Initialiser le modèle APRÈS l’enregistrement
-  await FaceRecognitionController().initializeModel();
-
-  // Lancer l'application
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => FaceRecognitionController(),
-      child: const Application(),
-    ),
-  );
-
-  // Autres configurations
+  Get.put(TagsController());
+  Get.put(FaceRecognitionController());
   configEasyLoading();
-  await checkPermission();
+  runApp(const Application());
 }
 
 void configEasyLoading() {
@@ -46,33 +44,4 @@ void configEasyLoading() {
     ..indicatorColor = Colors.white
     ..maskColor = primaryMaterialColor.shade300.withOpacity(0.5)
     ..userInteractions = true;
-}
-
-// Fonction pour vérifier et demander la permission de localisation
-Future<void> checkPermission() async {
-  bool serviceEnabled;
-  LocationPermission permission;
-  // Vérifie si le service de localisation est activé
-  serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  if (!serviceEnabled) {
-    // Si le service est désactivé, vous pouvez demande3.
-    // r à l'utilisateur de l'activer
-    return Future.error('Le service de localisation est désactivé.');
-  }
-
-  // Vérifie les permissions de localisation
-  permission = await Geolocator.checkPermission();
-  if (permission == LocationPermission.denied) {
-    permission = await Geolocator.requestPermission();
-    if (permission == LocationPermission.denied) {
-      // Si la permission est refusée, affiche un message
-      return Future.error('La permission de localisation est refusée.');
-    }
-  }
-
-  if (permission == LocationPermission.deniedForever) {
-    // Si la permission est refusée de manière permanente
-    return Future.error(
-        'La permission de localisation est refusée de manière permanente.');
-  }
 }

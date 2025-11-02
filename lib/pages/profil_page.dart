@@ -65,11 +65,25 @@ class _ProfilPageState extends State<ProfilPage> {
                         CircleAvatar(
                           radius: 40.0,
                           backgroundColor: blackColor,
-                          child: Image.asset(
-                            "assets/images/profil-2.png",
-                            fit: BoxFit.scaleDown,
-                            height: 60.0,
-                          ),
+                          child: authController.userSession.value!.photo !=
+                                      null &&
+                                  authController
+                                      .userSession.value!.photo!.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(80.0),
+                                  child: Image.network(
+                                    authController.userSession.value!.photo!,
+                                    fit: BoxFit.cover,
+                                    alignment: Alignment.center,
+                                    height: 80.0,
+                                    width: 80.0,
+                                  ),
+                                )
+                              : Image.asset(
+                                  "assets/images/profil-2.png",
+                                  fit: BoxFit.scaleDown,
+                                  height: 60.0,
+                                ),
                         ).marginOnly(right: 8.0),
                         Expanded(
                           child: Column(
@@ -77,7 +91,7 @@ class _ProfilPageState extends State<ProfilPage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                authController.userSession.value.fullname!,
+                                authController.userSession.value!.fullname!,
                                 style: Theme.of(context)
                                     .textTheme
                                     .headlineMedium!
@@ -90,27 +104,49 @@ class _ProfilPageState extends State<ProfilPage> {
                                 textAlign: TextAlign.center,
                               ).paddingBottom(5.0),
                               Text(
-                                authController.userSession.value.matricule!,
+                                authController.userSession.value!.matricule!,
                                 textAlign: TextAlign.center,
                               ).paddingBottom(5.0),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  const Icon(
-                                    CupertinoIcons.home,
-                                    size: 15.0,
-                                  ).paddingRight(5.0),
-                                  Text(
-                                    authController
-                                        .userSession.value.site!.name!,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge!
-                                        .copyWith(color: Colors.blue),
-                                  )
-                                ],
-                              ),
+                              if (authController
+                                      .userSession.value!.site!.name !=
+                                  null) ...[
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      CupertinoIcons.home,
+                                      size: 15.0,
+                                    ).paddingRight(5.0),
+                                    Text(
+                                      authController
+                                          .userSession.value!.site!.name!,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge!
+                                          .copyWith(color: Colors.blue),
+                                    )
+                                  ],
+                                ),
+                              ] else ...[
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      CupertinoIcons.person,
+                                      size: 15.0,
+                                    ).paddingRight(5.0),
+                                    Text(
+                                      "Superviseur",
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge!
+                                          .copyWith(color: Colors.blue),
+                                    )
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         )

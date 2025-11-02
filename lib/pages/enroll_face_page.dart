@@ -1,17 +1,22 @@
 import 'dart:io';
 
-import 'package:checkpoint_app/kernel/services/recognition_service.dart';
+import 'package:camera/camera.dart';
+import 'package:checkpoint_app/global/controllers.dart';
+import 'package:checkpoint_app/kernel/services/http_manager.dart';
 import 'package:checkpoint_app/themes/app_theme.dart';
+import 'package:checkpoint_app/widgets/costum_button.dart';
+import 'package:checkpoint_app/widgets/costum_icon_button.dart';
+import 'package:checkpoint_app/widgets/enroll_input.dart';
+import 'package:checkpoint_app/widgets/svg.dart';
 import 'package:checkpoint_app/widgets/user_status.dart';
 import 'package:dotted_border/dotted_border.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 
 import '../constants/styles.dart';
-import '../widgets/submit_button.dart';
 
 class EnrollFacePage extends StatefulWidget {
   const EnrollFacePage({super.key});
@@ -23,29 +28,48 @@ class EnrollFacePage extends StatefulWidget {
 class _EnrollFacePageState extends State<EnrollFacePage> {
   final TextEditingController _matriculeController = TextEditingController();
 
+  List<CameraDescription> cameras = [];
+  late CameraController _controller;
+  Future<void>? _initializeControllerFuture;
+  int _cameraIndex = 1; // 1 = front, 0 = back
+  bool _isFlashOn = false;
+
   String result = '';
   bool isLoading = false;
 
   XFile? pickedImage;
 
-  late FaceRecognitionController _controller;
+  @override
+  void initState() {
+    super.initState();
+    _initCamera();
+  }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _controller =
-        Provider.of<FaceRecognitionController>(context, listen: false);
+  void dispose() {
+    super.dispose();
+    _controller.dispose();
+  }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_controller.isModelInitializing && !_controller.isModelLoaded) {
-        _controller.initializeModel();
+  Future<void> _initCamera() async {
+    try {
+      cameras = await availableCameras();
+      _controller = CameraController(
+        cameras[_cameraIndex],
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
+      _initializeControllerFuture = _controller.initialize();
+      setState(() {});
+    } catch (e) {
+      if (kDebugMode) {
+        print("Erreur d'initialisation de la caméra : $e");
       }
-    });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = Provider.of<FaceRecognitionController>(context);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: darkColor,
@@ -63,214 +87,233 @@ class _EnrollFacePageState extends State<EnrollFacePage> {
           const UserStatus(name: "Gaston delimond").marginAll(8.0),
         ],
       ),
-      body: controller.isModelInitializing
-          ? const Center(child: CircularProgressIndicator())
-          : Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(15.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Veuillez enroller le visage de l'agent avec 3 captures. vous devez positionner la caméra sur le visage de l'agent !",
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                            color: Colors.grey,
-                            fontWeight: FontWeight.w500,
-                          ),
-                    ).paddingBottom(15.0),
-                    Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        if (isLoading) ...[
-                          SizedBox(
-                            height: 210.0,
-                            width: 210.0,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 4.0,
-                              color: primaryMaterialColor.shade300,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(15.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                "Cliquez pour prendre la photo du visage de l'agent à enroller.",
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                      color: primaryMaterialColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ).paddingBottom(15.0),
+              if (pickedImage != null) ...[
+                DottedBorder(
+                  color: Colors.green.shade400,
+                  radius: const Radius.circular(130.0),
+                  strokeWidth: 1.2,
+                  borderType: BorderType.RRect,
+                  dashPattern: const [6, 3],
+                  child: CircleAvatar(
+                    radius: 120.0,
+                    backgroundColor: darkColor,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(240.0),
+                      ),
+                      child: Image.file(
+                        width: 240.0,
+                        height: 240.0,
+                        File(pickedImage!.path),
+                        alignment: Alignment.center,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ).paddingBottom(15.0),
+              ] else ...[
+                FutureBuilder(
+                  future: _initializeControllerFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.done) {
+                      return ClipOval(
+                        child: SizedBox(
+                          width: 250,
+                          height: 250,
+                          child: FittedBox(
+                            fit: BoxFit.cover,
+                            child: SizedBox(
+                              width:
+                                  _controller.value.previewSize?.height ?? 250,
+                              height:
+                                  _controller.value.previewSize?.width ?? 250,
+                              child: CameraPreview(_controller),
                             ),
                           ),
-                        ],
-                        DottedBorder(
-                          color: primaryMaterialColor.shade500,
-                          radius: const Radius.circular(110.0),
-                          strokeWidth: 1.2,
-                          borderType: BorderType.RRect,
-                          dashPattern: const [6, 3],
-                          child: CircleAvatar(
-                            radius: 100.0,
-                            backgroundColor: darkColor,
-                            child: pickedImage != null
-                                ? ClipRRect(
-                                    borderRadius: const BorderRadius.all(
-                                      Radius.circular(100.0),
-                                    ),
-                                    child: Image.file(
-                                      width: 200.0,
-                                      height: 200.0,
-                                      File(pickedImage!.path),
-                                      alignment: Alignment.center,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  )
-                                : Center(
-                                    child: Image.asset(
-                                      "assets/images/profil-2.png",
-                                      height: 50.0,
-                                    ),
-                                  ),
-                          ).marginAll(4.0),
-                        )
-                      ],
-                    ).paddingBottom(15.0),
-                    Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12.0),
-                        border: Border.all(
-                          color: primaryMaterialColor.shade100,
                         ),
-                      ),
-                      width: MediaQuery.of(context).size.width,
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: TextField(
-                              controller: _matriculeController,
-                              textAlign: TextAlign.center,
-                              decoration: const InputDecoration(
-                                hintText: "Matricule de l'agent",
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                              ),
-                            ),
-                          )
-                        ],
-                      ).paddingHorizontal(8.0),
-                    ).paddingBottom(10.0),
-                    SizedBox(
-                      width: MediaQuery.of(context).size.width,
-                      height: 55.0,
-                      child: SubmitButton(
-                        label: "Enroller",
-                        loading: isLoading,
-                        onPressed: () => enrollWithMultipleCaptures(controller),
-                      ),
-                    )
-                  ],
-                ),
-              ),
-            ),
+                      );
+                    } else {
+                      return _loaderWidget();
+                    }
+                  },
+                ).paddingBottom(15.0),
+              ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CostumIconButton(
+                    color: Colors.blue.shade800,
+                    svg: "camera-toggle.svg",
+                    size: 60.0,
+                    onPress: _switchCamera,
+                  ).paddingRight(8.0),
+                  CostumIconButton(
+                    svg: pickedImage == null
+                        ? "camera-capture.svg"
+                        : "camera-refresh.svg",
+                    color: pickedImage == null
+                        ? Colors.deepPurple
+                        : Colors.green.shade400,
+                    size: 80.0,
+                    onPress: _capturePhoto,
+                  ).paddingRight(8.0),
+                  CostumIconButton(
+                    svg: _isFlashOn ? "flash-on-2.svg" : "flash-on-1.svg",
+                    size: 60.0,
+                    color: _cameraIndex == 1
+                        ? Colors.blue.shade200
+                        : Colors.blue.shade800,
+                    onPress: _toggleFlash,
+                  ),
+                ],
+              ).paddingBottom(15.0),
+              if (pickedImage != null) ...[
+                EnrollInput(controller: _matriculeController)
+                    .paddingBottom(10.0),
+                SizedBox(
+                  width: MediaQuery.of(context).size.width,
+                  height: 55.0,
+                  child: CostumButton(
+                    title: "Enroller",
+                    bgColor: primaryMaterialColor,
+                    labelColor: whiteColor,
+                    isLoading: isLoading,
+                    onPress: _enroll,
+                  ),
+                )
+              ]
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  Future<void> enrollWithMultipleCaptures(
-      FaceRecognitionController controller) async {
-    final name = _matriculeController.text.trim();
-    if (name.isEmpty) {
-      EasyLoading.showToast("Entrez le matricule de l'agent !");
-      return;
-    }
+  Widget _loaderWidget() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          height: 220.0,
+          width: 220.0,
+          child: CircularProgressIndicator(
+            strokeWidth: 4.0,
+            color: primaryMaterialColor.shade300,
+          ),
+        ),
+        SizedBox(
+          height: 220.0,
+          width: 220.0,
+          child: DottedBorder(
+            color: primaryMaterialColor.shade500,
+            radius: const Radius.circular(110.0),
+            strokeWidth: 1.2,
+            borderType: BorderType.RRect,
+            dashPattern: const [6, 3],
+            child: const Center(
+              child: Svg(
+                size: 40.0,
+                path: "camera-refresh.svg",
+                color: primaryMaterialColor,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-    final picker = ImagePicker();
-    List<XFile> validImages = [];
-    List<String> feedback = [];
-
-    setState(() {
-      isLoading = true;
-      result = "Capture en cours...";
-    });
-
-    // Assure que le modèle est chargé
-    if (!controller.isModelLoaded) {
-      try {
-        await controller.initializeModel();
-      } catch (e) {
-        setState(() {
-          isLoading = false;
-          result = "Erreur de chargement du modèle : $e";
-          EasyLoading.showToast("Erreur de chargement du modèle !");
-        });
-        return;
-      }
-    }
-
-    List<double>? referenceEmbedding;
-
-    for (int i = 0; i < 3; i++) {
-      final XFile? image = await picker.pickImage(source: ImageSource.camera);
-      if (image == null) {
-        feedback.add("Capture ${i + 1} : annulée.");
-        break;
-      }
-
-      final embedding = await controller.getEmbedding(image);
-      if (embedding == null) {
-        feedback.add(
-            "Image ${i + 1} : Aucun visage détecté. Enrôlement interrompu.");
-        break;
-      }
-
-      if (referenceEmbedding == null) {
-        // Première image : on fixe la référence
-        referenceEmbedding = embedding;
-        feedback.add("Image ${i + 1} : Visage détecté (référence)");
-        validImages.add(image);
-        setState(() {
-          pickedImage = validImages.last;
-        });
+  void _toggleFlash() async {
+    if (_cameraIndex == 0) {
+      setState(() {
+        _isFlashOn = !_isFlashOn;
+      });
+      await _controller
+          .setFlashMode(_isFlashOn ? FlashMode.torch : FlashMode.off);
+    } else {
+      setState(() {
+        _isFlashOn = !_isFlashOn;
+      });
+      if (_isFlashOn) {
+        await ScreenBrightness().setScreenBrightness(1.0);
       } else {
-        final distance =
-            controller.euclideanDistance(referenceEmbedding, embedding);
-        if (distance > 1.0) {
-          feedback.add(
-              "Image ${i + 1} : Visage différent détecté (distance = ${distance.toStringAsFixed(2)}). Enrôlement interrompu.");
-          EasyLoading.showToast(
-            "Visage différent détecté. Enrôlement interrompu",
-          );
-          break;
-        } else {
-          feedback.add(
-              "Image ${i + 1} :Visage cohérent (distance = ${distance.toStringAsFixed(2)})");
-          validImages.add(image);
-        }
+        await ScreenBrightness().resetApplicationScreenBrightness();
       }
     }
+  }
 
-    if (validImages.isEmpty) {
+  void _switchCamera() async {
+    _cameraIndex = (_cameraIndex + 1) % cameras.length;
+    await _controller.dispose();
+    await _initCamera();
+  }
+
+  Future<void> _capturePhoto() async {
+    if (!_controller.value.isInitialized) return;
+
+    if (pickedImage != null) {
       setState(() {
-        isLoading = false;
-        result =
-            "${feedback.join('\n')}\n Aucune image valide pour l'enrôlement.";
-        EasyLoading.showToast(
-          "Aucune image valide pour l'enrôlement.",
-        );
+        pickedImage = null;
       });
       return;
     }
-
     try {
-      await controller.addKnownFaceFromMultipleImages(name, validImages);
+      final file = await _controller.takePicture();
       setState(() {
-        isLoading = false;
-        result =
-            "${feedback.join('\n')}\n✅ $name enrôlé avec ${validImages.length} images valides.";
-        EasyLoading.showSuccess(
-            "Agent matricule $name enrôlé avec ${validImages.length} images valides.");
-        _matriculeController.clear();
+        pickedImage = XFile(file.path);
       });
+      tagsController.face.value = pickedImage;
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        result = "${feedback.join('\n')}\n Erreur lors de l'enrôlement : $e";
-        EasyLoading.showToast(
-          "Erreur lors de l'enrôlement.",
-        );
-      });
+      if (kDebugMode) {
+        print("Erreur capture : $e");
+      }
     }
+  }
+
+  Future<void> _enroll() async {
+    final matricule = _matriculeController.text.trim();
+    if (matricule.isEmpty) {
+      EasyLoading.showInfo("Entrez le matricule de l'agent !");
+      return;
+    }
+    final embedding =
+        await faceRecognitionController.getEmbedding(pickedImage!);
+    if (embedding == null || embedding.isEmpty) {
+      EasyLoading.showInfo(
+          "Aucun visage détecté. veuillez prendre une photo du visage !");
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    var manager = HttpManager();
+    tagsController.isLoading.value = true;
+    await faceRecognitionController.addKnownFaceFromImage(
+        matricule, pickedImage!);
+    manager.enrollAgent(matricule).then((value) {
+      _matriculeController.clear();
+      pickedImage = null;
+      tagsController.face.value = null;
+      setState(() => isLoading = false);
+      if (value != null) {
+        EasyLoading.showSuccess("Visage enrollé avec succès !");
+      }
+    });
   }
 }

@@ -16,7 +16,7 @@ Future<void> showSupervisorCompleter(context) async {
   showCustomModal(
     context,
     onClosed: () {
-      tagsController.isScanningModalOpen.value = false;
+      //tagsController.isScanningModalOpen.value = false;
     },
     title: "Patrouille zone QRCODE",
     child: Padding(
@@ -107,10 +107,11 @@ Future<void> showSupervisorCompleter(context) async {
                   tagsController.isLoading.value = true;
                   manager.completeArea(areaLibelle.text).then((value) {
                     tagsController.isLoading.value = false;
+                    tagsController.isScanningModalOpen.value = false;
                     if (value != "success") {
+                      Get.back();
                       EasyLoading.showToast(value);
                     } else {
-                      tagsController.isScanningModalOpen.value = false;
                       Get.back();
                       EasyLoading.showSuccess(
                         "Zone de patrouille completées avec succès !",

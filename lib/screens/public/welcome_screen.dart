@@ -1,9 +1,27 @@
 import 'package:checkpoint_app/constants/styles.dart';
-import 'package:checkpoint_app/pages/home_page.dart';
-import 'package:checkpoint_app/pages/stories_page.dart';
-import 'package:checkpoint_app/pages/tasks_page.dart';
-import 'package:checkpoint_app/widgets/svg.dart';
+import 'package:checkpoint_app/global/controllers.dart';
+import 'package:checkpoint_app/kernel/services/log_service.dart';
+import 'package:checkpoint_app/pages/enroll_face_page.dart';
+import 'package:checkpoint_app/pages/mobile_qr_scanner_011.dart';
+import 'package:checkpoint_app/pages/supervisor_agent.dart';
+import 'package:checkpoint_app/themes/app_theme.dart';
+import 'package:checkpoint_app/widgets/costum_button.dart';
+import 'package:checkpoint_app/widgets/user_status.dart';
+import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:get/get.dart';
+
+import '../../modals/recognition_face_modal.dart' show showRecognitionModal;
+import '../../modals/request_modal.dart';
+import '../../modals/signalement_modal.dart';
+import '../../pages/announce_page.dart';
+import '../../pages/mobile_qr_scanner.dart' show MobileQrScannerPage;
+import '../../pages/patrol_planning.dart';
+import '../../pages/profil_page.dart';
+import '../../pages/supervisor_qrcode_completer.dart';
+
+import '../../widgets/home_menu_btn.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -13,87 +31,239 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
-  int _selectedPage = 0;
+  /* final AppUpdateService _updateService = AppUpdateService(); */
 
-  final List<Widget> _pages = [
-    const HomePage(),
-    const TaskPage(),
-    const StoriesPage()
-  ];
+  // Liste des boutons
+  List<Widget> menuButtons = [];
 
   @override
   void initState() {
     super.initState();
+    initMenus();
   }
 
-  void onPageChanged(index) {
-    setState(() {
-      _selectedPage = index;
+  initMenus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final isGuard =
+          authController.userSession.value!.role!.toLowerCase() == 'guard';
+      final isSupervisor =
+          authController.userSession.value!.role!.toLowerCase() == 'supervisor';
+      if (mounted) {
+        setState(() {
+          menuButtons = [
+            HomeMenuBtn(
+              icon: "presence",
+              title: "Présence",
+              onPress: () {
+                _showBottonPresenceChoice(context);
+              },
+            ),
+            if (isGuard) ...[
+              HomeMenuBtn(
+                icon: "qrcode",
+                title: "Patrouille",
+                onPress: () {
+                  if (tagsController.patrolId.value != 0) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MobileQrScannerPage(),
+                      ),
+                    );
+                  } else {
+                    EasyLoading.showToast(
+                      "Veuillez sélectionner votre planning de patrouille !",
+                    );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PatrolPlanning(),
+                      ),
+                    );
+                  }
+                },
+              ),
+              HomeMenuBtn(
+                icon: "planning",
+                title: "Planning",
+                onPress: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PatrolPlanning(),
+                    ),
+                  );
+                },
+              ),
+            ] else ...[
+              HomeMenuBtn(
+                icon: "car-scan-1",
+                title: "Ronde car",
+                onPress: () {
+                  authController.refreshSupervision();
+                  authController.refreshEe();
+                  if (authController.pendingSupervision.value != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SupervisorAgent(),
+                      ),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MobileQrScannerPage011(),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+            HomeMenuBtn(
+              icon: "request-2",
+              title: "Requêtes",
+              onPress: () {
+                showRequestModal(context);
+              },
+            ),
+            HomeMenuBtn(
+              icon: "incident",
+              title: "Signalements",
+              onPress: () {
+                showSignalementModal(context);
+              },
+            ),
+            HomeMenuBtn(
+              icon: "notify",
+              title: "Communiqués",
+              onPress: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AnnouncePage()),
+                );
+              },
+            ),
+            HomeMenuBtn(
+              icon: "user-1",
+              title: "Profil",
+              onPress: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilPage()),
+                );
+              },
+            ),
+            if (isSupervisor) ...[
+              HomeMenuBtn(
+                icon: "face-2",
+                title: "Enrôlement",
+                onPress: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const EnrollFacePage(),
+                    ),
+                  );
+                },
+              ),
+              HomeMenuBtn(
+                icon: "qrcode",
+                title: "Completer zone",
+                onPress: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SupervisorQRCODECompleter(),
+                    ),
+                  );
+                },
+              ),
+              HomeMenuBtn(
+                icon: "pin-6",
+                title: "Completer site",
+                onPress: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) =>
+                              const MobileQrScannerPage011(isStationGps: true),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ];
+        });
+      }
     });
+  }
+
+  Future<void> handlePowerEventAndStartHeartbeat(BuildContext context) async {
+    await LogService.loadPowerEvents();
+    LogService.startActivityHeartbeat();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages.elementAt(_selectedPage),
-      bottomNavigationBar: BottomNavigationBar(
-        onTap: onPageChanged,
-        currentIndex: _selectedPage,
-        selectedLabelStyle: const TextStyle(
-          fontFamily: "Staatliches",
-          fontWeight: FontWeight.w900,
+      appBar: AppBar(
+        backgroundColor: darkColor,
+        title: Row(
+          children: [
+            Image.asset(
+              "assets/images/mamba.png",
+              height: 35.0,
+            ).paddingRight(8.0),
+            const Text(
+              "SALAMA",
+              style: TextStyle(
+                fontSize: 30.0,
+                fontWeight: FontWeight.w900,
+                color: whiteColor,
+                fontFamily: 'Staatliches',
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
         ),
-        selectedItemColor: primaryColor,
-        unselectedItemColor: Colors.grey,
-        unselectedLabelStyle: const TextStyle(
-          fontFamily: "Staatliches",
-        ),
-        items: const [
-          BottomNavigationBarItem(
-            activeIcon: Svg(
-              path: "menu-2.svg",
-              size: 24.0,
-              color: primaryColor,
-            ),
-            icon: Svg(
-              path: "menu-2.svg",
-              size: 24.0,
-              color: Colors.grey,
-            ),
-            label: "Accueil",
-          ),
-          BottomNavigationBarItem(
-            activeIcon: Svg(
-              path: "tasks-2.svg",
-              size: 24,
-              color: primaryColor,
-            ),
-            icon: Svg(
-              path: "tasks-2.svg",
-              size: 24,
-              color: Colors.grey,
-            ),
-            label: "Mes tâches",
-          ),
-          BottomNavigationBarItem(
-            activeIcon: Svg(
-              path: "hisory.svg",
-              size: 24.0,
-              color: primaryColor,
-            ),
-            icon: Svg(
-              path: "history.svg",
-              size: 24.0,
-              color: Colors.grey,
-            ),
-            label: "Historique",
-          ),
-        ],
+        actions: [const UserStatus(name: "Gaston delimond").marginAll(8.0)],
       ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(10.0),
+        child: Obx(() {
+          return Column(
+            children: [
+              _btnPatrolPending().paddingBottom(20.0).paddingTop(10.0),
+              GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                children: menuButtons,
+              ),
+            ],
+          );
+        }),
+      ),
+      /* floatingActionButton: FloatingActionButton(
+          backgroundColor: primaryMaterialColor,
+          tooltip: "Appuyez longtemps pour déclencher un alèrte !",
+          elevation: 10,
+          onPressed: () async {
+            _updateService.checkForUpdate(context);
+          },
+          child: Image.asset(
+            "assets/icons/sirene.png",
+            height: 35.0,
+          ),
+        ) */
     );
   }
 
-  /* void _showBottonPatrolChoice(BuildContext context) {
+  void _showBottonPatrolChoice(BuildContext context) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -118,7 +288,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const QRcodeScannerPage(),
+                          builder: (context) => const MobileQrScannerPage(),
                         ),
                       );
                     },
@@ -132,7 +302,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     labelColor: Colors.white,
                     onPress: () {
                       Get.back();
-                      showClosePatrolModal(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MobileQrScannerPage(),
+                        ),
+                      );
                     },
                   ),
                 ),
@@ -164,8 +339,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   child: CostumButton(
                     bgColor: primaryMaterialColor.shade100,
                     title: "Signer mon arrivée",
-                    onPress: () async {
-                      Navigator.pop(context);
+                    onPress: () {
+                      tagsController.isLoading.value = false;
+                      Get.back();
+                      showRecognitionModal(context, key: "check-in");
                     },
                   ),
                 ),
@@ -176,7 +353,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     bgColor: primaryMaterialColor,
                     labelColor: Colors.white,
                     onPress: () {
-                      Navigator.pop(context);
+                      tagsController.isLoading.value = false;
+                      Get.back();
+                      showRecognitionModal(context, key: "check-out");
                     },
                   ),
                 ),
@@ -186,5 +365,133 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         );
       },
     );
-  } */
+  }
+
+  Widget _btnPatrolPending() {
+    return DottedBorder(
+      color: primaryMaterialColor.shade400,
+      radius: const Radius.circular(12.0),
+      strokeWidth: 1,
+      borderType: BorderType.RRect,
+      dashPattern: const [6, 3], // Optionnel, personnalise les pointillés
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
+        child: InkWell(
+          borderRadius: const BorderRadius.all(Radius.circular(12)),
+          onTap: () {
+            if (authController.userSession.value!.role == 'guard') {
+              if (tagsController.patrolId.value != 0) {
+                _showBottonPatrolChoice(context);
+              } else {
+                EasyLoading.showToast(
+                  "Veuillez sélectionner votre planning de patrouille !",
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PatrolPlanning(),
+                  ),
+                );
+              }
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SupervisorQRCODECompleter(),
+                ),
+              );
+            }
+          },
+          child: ClipRRect(
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+            child: Container(
+              // Utilise padding plutôt que margin
+              color: Colors.white,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    "assets/images/patrol_illustration.png",
+                    height: 80.0,
+                  ).paddingRight(8.0),
+                  if (authController.userSession.value!.role == 'guard') ...[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (tagsController.patrolId.value != 0) ...[
+                            Text(
+                              "Patrouille en cours disponible",
+                              style: TextStyle(
+                                fontFamily: 'Staatliches',
+                                color: primaryMaterialColor.shade600,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15.0,
+                              ),
+                            ),
+                            const SizedBox(height: 4.0),
+                            const Text(
+                              "Veuillez cliquer ici pour clôturer ou poursuivre la patrouille en cours.",
+                              style: TextStyle(
+                                fontFamily: "Poppins",
+                                fontSize: 10.0,
+                              ),
+                            ),
+                          ] else ...[
+                            Text(
+                              "Bienvenue agent ${authController.userSession.value!.fullname}",
+                              style: const TextStyle(
+                                fontFamily: 'Staatliches',
+                                color: primaryMaterialColor,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15.0,
+                              ),
+                            ),
+                            const SizedBox(height: 4.0),
+                            const Text(
+                              "Veuillez cliquer pour commencer une nouvelle patrouille.",
+                              style: TextStyle(
+                                fontFamily: "Poppins",
+                                fontSize: 10.0,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Bienvenue Superviseur ${authController.userSession.value!.fullname} !",
+                            style: const TextStyle(
+                              fontFamily: 'Staatliches',
+                              color: primaryMaterialColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15.0,
+                            ),
+                          ),
+                          const SizedBox(height: 4.0),
+                          const Text(
+                            "Vous pouvez completer les zones de patrouille et aussi enrôler les visages des agents.",
+                            style: TextStyle(
+                              fontFamily: "Poppins",
+                              fontSize: 10.0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

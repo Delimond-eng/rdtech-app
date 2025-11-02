@@ -1,3 +1,4 @@
+import 'package:checkpoint_app/themes/app_theme.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 
@@ -11,19 +12,20 @@ class CostumButton extends StatelessWidget {
   final VoidCallback? onPress;
   final bool isLoading;
 
-  const CostumButton(
-      {super.key,
-      required this.title,
-      this.onPress,
-      this.labelColor,
-      this.bgColor,
-      this.borderColor,
-      this.isLoading = false});
+  const CostumButton({
+    super.key,
+    required this.title,
+    this.onPress,
+    this.labelColor,
+    this.bgColor,
+    this.borderColor,
+    this.isLoading = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return DottedBorder(
-      color: borderColor ?? primaryColor,
+      color: borderColor ?? primaryMaterialColor.shade200,
       radius: const Radius.circular(12.0),
       strokeWidth: 1,
       borderType: BorderType.RRect,
@@ -31,7 +33,7 @@ class CostumButton extends StatelessWidget {
       child: ClipRRect(
         borderRadius: const BorderRadius.all(Radius.circular(12)),
         child: Material(
-          color: Colors.transparent,
+          color: primaryMaterialColor.shade50.withOpacity(.2),
           child: InkWell(
             onTap: isLoading ? null : onPress,
             borderRadius: BorderRadius.circular(12.0),
@@ -62,9 +64,9 @@ class CostumButton extends StatelessWidget {
                         letterSpacing: 1,
                         fontSize: 13.0,
                       ),
-                    )
+                    ),
                 ],
-              ),
+              ).paddingHorizontal(8.0),
             ),
           ),
         ),
